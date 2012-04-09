@@ -1,0 +1,41 @@
+ABOUT
+
+Donut Bot is a Campfire chatbot that allows team members to share and gamble virtual donuts.
+
+Written by Nathan Wong at BuySellAds.com
+ - http://nathan.ca/
+ - http://buysellads.com/
+
+For more details, see [blog post URL]
+
+
+INSTALLATION
+
+ - Install Node.js (http://nodejs.org/)
+ - Create a new donutbot project directory with all of the files from this repository
+ - Install node-dirty with npm in your project directory (https://github.com/felixge/node-dirty)
+ - Download and extract node-campfire into your node_modules folder in your project directory
+   (https://github.com/tristandunn/node-campfire)
+ 
+ - In Campfire, go to the "Users" tab and then follow "People on your site" (you must be an administrator)
+ - Add a new person named "Donut Bot", and login to Campfire as this user.
+ - Once logged in, click "My Info" in the top-right and then copy the API auth token provided.
+ 
+ - Open up config.js and modify the following configuration settings:
+   - exports.campfire to use the account subdomain of your Campfire account, and Donut Bot's API auth token.
+   - exports.rooms to include the ID of every room in which you'd like Donut Bot to hangout.
+     Note: The room ID is the number at the end of the URL of the given room.
+   - exports.users to map Campfire user IDs to the nicknames by which Donut Bot will recognize people.
+     Note: User IDs can be found in the reset or delete link on the "People in your Company" page.
+   - exports.defaults to specify the number of donuts each user should start with.
+
+ - Run `node bot.js` and you're off to the races! 
+
+
+NOTES
+
+ - We use nohup (e.g. `nohup node bot.js &`) to run the Donut Bot 24/7 in the background
+ - To reset donut totals, stop node.js, delete data.db, and restart the bot.
+ - Do not expect real donuts out of this.
+
+If you need any help getting things setup, get in touch.
