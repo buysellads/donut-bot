@@ -19,3 +19,15 @@ exports.defaults = {
 	'person2': 1000,
 	'person3': 1000
 };
+
+exports.defaultmsgs = {
+	'nathan': [],
+	'person2': [],
+	'person3': []
+};
+
+exports.defaultstatuses = {
+	'nathan': '',
+	'person2': '',
+	'person3': ''
+};

@@ -16,6 +16,10 @@ exports.commands = [
 			+ "\t!leaderboard\n\t\tSee how many donuts everyone has\n"
 			+ "\t!roulette N bet\n\t\tBet N donuts on the roulette table, e.g. !roulette 10 red or !roulette 5 14\n"
 			+ "\t!spin\n\t\tOnce all bets are in, spin the roulette wheel\n"
+			+ "\t!m who msg\n\t\tLeave a message for someone.\n"
+			+ "\t!w\n\t\tPull up your messages (w, as-in what'd I miss?) - this will clear your messages\n"
+			+ "\t!status msg\n\t\tSet your current status (leave blank to clear)\n"
+			+ "\t!team\n\t\tList everyone's current status\n"
 			+ "\nDo not expect real donuts out of this.");
 	} ],
 
@@ -131,5 +135,56 @@ exports.commands = [
 
 			wagers[room.id] = []; // clear it
 		}
-	} ]
+	} ],
+
+	// messaging
+	// !m who msg
+	['m', function(room, sender, give) {
+		var who = give[1],
+			msg = give.slice(2).join(' ');
+
+		if (msg.length == 0);
+		else if (!data.validUser(who)) room.speak('I\'m sorry, I don\'t recognize ' + ucfirst(who));
+		else {
+			data.leaveMessage(sender, who, msg);
+			if (data.getStatus(who)) room.speak('Message saved. ' + ucfirst(who) + '\'s current status is: ' + data.getStatus(who));
+		}
+	}],
+	// !w
+	['w', function(room, sender, give) {
+
+		var msgs = data.getMessages(sender);
+		if (!msgs.length) room.speak('You do not have any messages at this time, ' + ucfirst(sender));
+		else {
+			data.clearMessages(sender);
+
+			room.paste('Messages for ' + ucfirst(sender) + "\n\t" + msgs.join("\n\t"));
+		}
+	}],
+
+	// !team
+	['team', function(room) {
+		var statuses = data.allStatuses(),
+			users = [];
+
+		for (var user in statuses)
+			users.push([user, statuses[user]]);
+
+		users.sort(function(a, b) {
+			return b[1] - a[1];
+		});
+
+		var ret = "Current Statuses:\n";
+		for (var user in users)
+			if (users[user][1].length) ret += "\t" + ucfirst(users[user][0]) + ': ' + users[user][1] + "\n";
+
+		room.paste(ret);
+	}],
+
+	// !status what
+	['status', function(room, sender, give) {
+		var st = give.slice(1).join(' ') || '';
+
+		data.setStatus(sender, st);
+	}],
 ];
