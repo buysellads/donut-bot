@@ -1,5 +1,10 @@
 var config = require('./config');
 
+process.on('uncaughtException', function (err) {
+	console.error(err.stack);
+	console.log('Node NOT Exiting...');
+});
+
 // join the rooms and handle our commands
 var commands = require('./commands'),
 	joinRoom = function (roomid) {
