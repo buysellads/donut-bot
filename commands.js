@@ -2,7 +2,46 @@
 var config = require('./config'),
 	data = require('./data'),
 	ucfirst = function (str) { return str.charAt(0).toUpperCase() + str.substr(1); },
-	roulette = require('./roulette');
+	roulette = require('./roulette'),
+	blackjack = require('./blackjack');
+
+// handle the room dealout here since it's used in multiple places
+function DealOut(room) {
+	var dealer = blackjack.dealOut(room.id),
+		dealertotal = blackjack.CalculateHandTotal(dealer),
+		wagers = blackjack.getWagers(room.id);
+	room.speak('The dealer has dealt: ' + blackjack.OutputHand(dealer) + (dealertotal > 21 ? ' - bust!' : ''));
+	for(var i = 0; i < wagers.length; i++) {
+		var sender = wagers[i][0],
+			amount = wagers[i][1],
+			cards = wagers[i][2],
+			points = blackjack.CalculateHandTotal(cards);
+		if (points > 21) {
+			// bust, they get nothing.
+		} else if (cards.length >= 5) {
+			// charlie
+			data.give(sender, amount + amount);
+			room.speak('    ' + ucfirst(sender) + ' wins ' + amount + ' donuts!');
+		} else if (points == dealertotal) {
+			// push
+			data.give(sender, amount);
+			room.speak('    ' + ucfirst(sender) + ' pushes');
+		} else if (points == 21 && cards.length == 2) {
+			// blackjack
+			var payout = Math.ceil(amount  * 3/2);
+			data.give(sender, amount + payout);
+			room.speak('    ' + ucfirst(sender) + ' wins ' + payout + ' donuts!');
+		} else if (points > dealertotal || dealertotal > 21) {
+			// beat the dealer, or dealer bust
+			data.give(sender, amount + amount);
+			room.speak('    ' + ucfirst(sender) + ' wins ' + amount + ' donuts!');
+		} else {
+			// loser.
+		}
+	}
+
+	blackjack.endGame(room.id);
+}
 
 exports.commands = [
 
@@ -16,6 +55,8 @@ exports.commands = [
 			+ "\t!leaderboard\n\t\tSee how many donuts everyone has\n"
 			+ "\t!roulette N bet\n\t\tBet N donuts on the roulette table, e.g. !roulette 10 red or !roulette 5 14\n"
 			+ "\t!spin\n\t\tOnce all bets are in, spin the roulette wheel\n"
+			+ "\t!blackjack N\n\t\tBet N donuts at the Blackjack table, e.g. !blackjack 25\n"
+			+ "\t!deal\n\t\tOnce all bets are in, deal the Blackjack hand\n"
 			+ "\t!m who msg\n\t\tLeave a message for someone.\n"
 			+ "\t!w\n\t\tPull up your messages (w, as-in what'd I miss?) - this will clear your messages\n"
 			+ "\t!status msg\n\t\tSet your current status (leave blank to clear)\n"
@@ -113,6 +154,97 @@ exports.commands = [
 				}
 			}
 		}
+	}],
+	
+	// !blackjack 25
+	['blackjack', function(room, sender, bet) {
+
+		if (blackjack.inGame(room.id)) {
+			room.speak('Sorry ' + ucfirst(sender) + ', there is already a blackjack game in progress.');
+		} else {
+			var amount = parseInt(bet[1], 10) || 0;
+
+			if (!data.take(sender, amount)) {
+				room.speak(ucfirst(sender) + ', you do not have ' + amount + ' donuts to give');
+			} else {
+				blackjack.bet(room.id, sender, amount);
+				room.speak(ucfirst(sender) + ' has sat down at the blackjack table with a ' + amount + ' donut wager! Type !deal to deal the cards.');
+			}
+		}
+	}],
+	// !deal
+	['deal', function(room, sender) {
+		if (blackjack.inGame(room.id)) {
+			room.speak('Sorry ' + ucfirst(sender) + ', there is already a blackjack game in progress.');
+		} else {
+			// only do this if there are blackjack wagers
+			if (blackjack.hasWagers(room.id)) {
+				var housecard = blackjack.initDeck(room.id);
+
+				room.speak('Let\'s dance! Dealer shows ' + blackjack.ShowCard(housecard));
+				var wagers = blackjack.getWagers(room.id);
+				for (var i = 0; i < wagers.length; i++) {
+					var wager = wagers[i],
+						sender = wager[0],
+						amount = wager[1],
+						cards = wager[2];
+					room.speak('   ' + ucfirst(sender) + ': ' + blackjack.showPlayerHand(room.id, sender));
+				}
+				room.speak('Players, please !hitme, !stand, or !double. Dealer stands on soft-17.');
+
+				if (!blackjack.hasPlayersLeft(room.id))
+					DealOut(room);				
+			}
+		}
+	}],
+	// !hitme
+	['hitme', function(room, sender) {
+		if (blackjack.inGame(room.id) && blackjack.hasPlayer(room.id, sender)) {
+			var card = blackjack.hit(room.id, sender),
+				total = blackjack.getHandTotal(room.id, sender);
+
+			room.speak(ucfirst(sender) + ' hits: ' + blackjack.showPlayerHand(room.id, sender) + (total > 21 ? ' - bust!' : ''));
+
+			if (!blackjack.hasPlayersLeft(room.id))
+				DealOut(room);
+		}
+	}],
+	// !double
+	['double', function(room, sender) {
+		if (blackjack.inGame(room.id) && blackjack.hasPlayer(room.id, sender)) {
+			var wager = blackjack.getWagers(room.id)[blackjack.getWager(room.id, sender)],
+				amount = wager[1];
+			
+			if (wager[2].length != 2) {
+				room.speak('Sorry ' + ucfirst(sender) + ', you can\'t double after hitting.');
+			} else if (!data.take(sender, amount)) {
+				room.speak(ucfirst(sender) + ', you do not have ' + amount + ' donuts to give');
+			} else {
+				var card = blackjack.double(room.id, sender),
+					total = blackjack.getHandTotal(room.id, sender);
+
+				room.speak(ucfirst(sender) + ' doubles: ' + blackjack.showPlayerHand(room.id, sender) + (total > 21 ? ' - bust!' : ''));
+
+				if (!blackjack.hasPlayersLeft(room.id))
+					DealOut(room);
+			}
+		}
+	}],
+	// !stand
+	['stand', function(room, sender) {
+		if (blackjack.inGame(room.id) && blackjack.hasPlayer(room.id, sender)) {
+
+			blackjack.stand(room.id, sender);
+
+			room.speak(ucfirst(sender) + ' stands');
+
+			if (!blackjack.hasPlayersLeft(room.id))
+				DealOut(room);
+		}
+	}],
+	// !split
+	['split', function(room, sender, give) {
+		room.speak('Sorry, ' + ucfirst(sender) + ', I don\'t support splitting yet. :(');
 	}],
 
 	// messaging
