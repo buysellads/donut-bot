@@ -61,6 +61,11 @@ exports.commands = [
 			+ "\t!w\n\t\tPull up your messages (w, as-in what'd I miss?) - this will clear your messages\n"
 			+ "\t!status msg\n\t\tSet your current status (leave blank to clear)\n"
 			+ "\t!team\n\t\tList everyone's current status\n"
+			+ "\t!securities\n\t\tList all available securities\n"
+			+ "\t!quote security\n\t\tSee information about a given security\n"
+			+ "\t!holdings\n\t\tList all your owned securities\n"
+			+ "\t!orders\n\t\tList all your open orders\n"
+			+ "\t!tran security buy/sell/cancel price shares\n\t\tExecute an order\n"
 			+ "\nDo not expect real donuts out of this.");
 	} ],
 
@@ -296,5 +301,72 @@ exports.commands = [
 		var st = give.slice(1).join(' ') || '';
 
 		data.setStatus(sender, st);
+	}],
+	
+	// !securities
+	['securities', function(room) {
+		room.paste(securities.listAll());
+	}],
+	// !tran [id] [buy/sell/cancel] [price] [shares]
+	['tran', function(room, sender, tran) {
+		var id = parseInt(tran[1], 10),
+			what = tran[2],
+			price = parseInt(tran[3], 10),
+			shares = parseInt(tran[4], 10);
+		if (id == 0 || (what != 'buy' && what != 'sell' && what != 'cancel') || ((what == 'buy' || what == 'sell') && price == 0 || shares == 0)) {
+			room.speak(ucfirst(sender) + ': !tran [security] [buy/sell/cancel] [price] [shares]');
+		} else {
+			if (what == 'cancel') {
+				securities.cancelOrder(sender, id);
+			} else {
+				if (!securities.placeOrder(sender, id, what, price, shares)) {
+					room.speak(ucfirst(sender) + ': Unable to place order :( You may need to cancel an existing order.');
+				} else {
+					room.speak(ucfirst(sender) + ': You have successfully placed an order on ' + id);
+					var f = securities.fulfillOrders(id);
+					for(var i = 0; i < f.length; i++) {
+						room.speak(ucfirst(f[i]));
+					}
+				}
+			}
+		}
+	}],
+	// !quote [id]
+	['quote', function(room, sender, id) {
+		room.paste(securities.getQuote(id[1]));
+	}],
+	// !holdings
+	['holdings', function(room, sender) {
+		var worth = {}, holdings = securities.listHoldings(sender, worth);
+		room.paste(ucfirst(sender) + ', your current holdings (totalling ' + worth.value + ' donuts in worth) are: \n\t' + holdings.replace("\n", "\n\t"));
+	}],
+	// !orders
+	['orders', function(room, sender) {
+		room.paste(ucfirst(sender) + ', your current pending orders are: \n\t' + securities.listOrders(sender).replace("\n", "\n\t"));
+	}],
+	// !setearnings [json]
+	['setearnings', function(room, sender, json) {
+		if (sender != 'nathan') {
+			room.speak('Permission denied');
+		}
+
+		json.shift(); // get rid of !setearnings
+		var set = securities.setEarnings(JSON.parse(json.join(' ')));
+		// fulfill orders in case donut bot wants to clean some of these open orders up
+
+		for(var seti = 0; seti < set.length; seti++) {
+			var f = securities.fulfillOrders(set[seti]);
+			for(var i = 0; i < f.length; i++) {
+				room.speak(ucfirst(f[i]));
+			}
+		}
+	}],
+	// !paydividends
+	['paydividends', function(room, sender, data) {
+		if (sender != config.admin) {
+			room.speak('Permission denied');
+		}
+
+		room.paste('Dividend time!' + "\n\n\t" + securities.payDividends(data[1] || 1.0).replace("\n", "\n\t"));
 	}],
 ];
